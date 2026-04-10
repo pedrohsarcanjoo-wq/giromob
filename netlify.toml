@@ -4,3 +4,8 @@
 
 [build.environment]
   NODE_ENV = "development"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
