@@ -17,7 +17,7 @@ git commit -m "Arquitetura Giromob: Dashboard Frontend Premium e Isolamento Mult
 
 echo.
 echo Enviando codigos diretos para a Web (Repositório Principal)...
-git push -u origin main
+git push -u origin main --force
 
 echo.
 echo =======================================
