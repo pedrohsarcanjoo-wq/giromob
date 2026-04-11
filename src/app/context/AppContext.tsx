@@ -42,11 +42,12 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [contasBancarias, setContasBancarias] = useState<ContaBancaria[]>(seedData.contasBancarias);
-  const [clientes, setClientes] = useState<Cliente[]>(seedData.clientes);
-  const [categorias, setCategorias] = useState<CategoriaCusto[]>(seedData.categorias);
-  const [contasReceber, setContasReceber] = useState<ContaReceber[]>(seedData.contasReceber);
-  const [contasPagar, setContasPagar] = useState<ContaPagar[]>(seedData.contasPagar);
+ const [contasBancarias, setContasBancarias] = useState<ContaBancaria[]>([]);
+ const [clientes, setClientes] = useState<Cliente[]>([]);
+ const [categorias, setCategorias] = useState<CategoriaCusto[]>([]);
+ const [contasReceber, setContasReceber] = useState<ContaReceber[]>([]);
+ const [contasPagar, setContasPagar] = useState<ContaPagar[]>([]);
+
 
   useEffect(() => {
     const fetchDadosBackend = async () => {
