@@ -35,6 +35,7 @@ interface AppContextType {
   
   // Contas a Pagar
   addContaPagar: (conta: Omit<ContaPagar, 'id' | 'created_at'>) => void;
+  addContasPagarParceladas: (conta: Omit<ContaPagar, 'id' | 'created_at' | 'parcela_atual' | 'total_parcelas' | 'grupo_parcelamento'>, totalParcelas: number) => void;
   updateContaPagar: (id: string, conta: Partial<ContaPagar>) => void;
   confirmarPagamento: (id: string, contaBancariaId: string) => void;
 }
@@ -148,6 +149,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     api.put(`/contas-pagar/${id}`, updates).catch(() => {});
   };
 
+  const addContasPagarParceladas = (conta: Omit<ContaPagar, 'id' | 'created_at' | 'parcela_atual' | 'total_parcelas' | 'grupo_parcelamento'>, totalParcelas: number) => {
+    const grupoId = generateId();
+    const novasParcelas: ContaPagar[] = [];
+
+    for (let i = 0; i < totalParcelas; i++) {
+      // Calcula a data de vencimento de cada parcela (mês a mês)
+      const dataBase = new Date(conta.data_vencimento + 'T12:00:00Z');
+      dataBase.setMonth(dataBase.getMonth() + i);
+      const dataVencimento = dataBase.toISOString().split('T')[0];
+      const competencia = dataVencimento.substring(0, 7);
+
+      const parcela: ContaPagar = {
+        ...conta,
+        id: generateId(),
+        created_at: new Date().toISOString(),
+        data_vencimento: dataVencimento,
+        competencia,
+        parcela_atual: i + 1,
+        total_parcelas: totalParcelas,
+        grupo_parcelamento: grupoId,
+      };
+
+      novasParcelas.push(parcela);
+    }
+
+    setContasPagar(prev => [...prev, ...novasParcelas]);
+    
+    // Envia todas as parcelas em lote (batch) para a nova rota bulk
+    api.post('/contas-pagar/bulk', { parcelas: novasParcelas }).catch((err) => {
+      console.error('Erro ao salvar parcelas em lote:', err);
+    });
+  };
+
   const confirmarPagamento = (id: string, contaBancariaId: string) => {
     setContasPagar(contasPagar.map(c => {
       if (c.id === id) {
@@ -180,6 +214,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateContaReceber,
       confirmarRecebimento,
       addContaPagar,
+      addContasPagarParceladas,
       updateContaPagar,
       confirmarPagamento,
     }}>

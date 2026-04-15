@@ -90,8 +90,8 @@ export function Sidebar() {
           {/* Header */}
           <div className="p-6 border-b border-sidebar-border">
             <div className="flex items-center justify-center mb-4">
-              <img src="/logo-clara.png" alt="GiroMob" className="h-12 w-auto dark:hidden" />
-              <img src="/logo-escura.png" alt="GiroMob" className="h-12 w-auto hidden dark:block" />
+              <img src={logoClara} alt="GiroMob" className="h-12 w-auto dark:hidden" />
+              <img src={logoEscura} alt="GiroMob" className="h-12 w-auto hidden dark:block" />
             </div>
           </div>
 

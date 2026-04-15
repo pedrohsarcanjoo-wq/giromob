@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatCurrency, formatDate, isDatePast } from '../utils/formatters';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -31,9 +31,11 @@ import {
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Plus, Check, Pencil, Filter, Inbox } from 'lucide-react';
+import { Plus, Check, Pencil, Filter, Inbox, CreditCard, Layers, ChevronDown, ChevronRight, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { ContaPagar, StatusDespesa } from '../types';
+import { cn } from '../components/ui/utils';
+import { gerarVoucherPagamento } from '../utils/pdfGenerator';
 
 export function ContasPagar() {
   const {
@@ -41,6 +43,7 @@ export function ContasPagar() {
     categorias,
     contasBancarias,
     addContaPagar,
+    addContasPagarParceladas,
     updateContaPagar,
     confirmarPagamento,
   } = useApp();
@@ -53,6 +56,35 @@ export function ContasPagar() {
   // Filtros
   const [statusFilter, setStatusFilter] = useState<StatusDespesa | 'todos'>('todos');
   const [categoriaFilter, setCategoriaFilter] = useState('todos');
+
+  // Grupos de parcelamento expandidos
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // Helpers
+  const getCategoriaName = (catId: string) =>
+    categorias.find(c => c.id === catId)?.nome || 'Sem categoria';
+  const getContaBancariaName = (id?: string) =>
+    id ? (contasBancarias.find(c => c.id === id)?.nome || id) : undefined;
+
+  const handleVoucherPagamento = (conta: ContaPagar) => {
+    gerarVoucherPagamento({
+      id: conta.id,
+      fornecedor: conta.fornecedor,
+      descricao: conta.descricao,
+      valor: conta.valor,
+      data_pagamento: conta.data_pagamento || new Date().toISOString().split('T')[0],
+      data_vencimento: conta.data_vencimento,
+      categoria: getCategoriaName(conta.categoria_id),
+      conta_bancaria: getContaBancariaName(conta.conta_bancaria_id),
+      parcela_atual: conta.parcela_atual,
+      total_parcelas: conta.total_parcelas,
+    });
+    toast.success('Comprovante gerado!');
+  };
+
+  // Modo parcelado
+  const [isParcelado, setIsParcelado] = useState(false);
+  const [numParcelas, setNumParcelas] = useState(2);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -77,17 +109,18 @@ export function ContasPagar() {
       status: 'previsto',
       conta_bancaria_id: '',
     });
+    setIsParcelado(false);
+    setNumParcelas(2);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!formData.fornecedor || !formData.categoria_id || !formData.valor || !formData.data_vencimento || !formData.competencia) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
 
-    const data = {
+    const base = {
       fornecedor: formData.fornecedor,
       categoria_id: formData.categoria_id,
       descricao: formData.descricao || undefined,
@@ -100,10 +133,15 @@ export function ContasPagar() {
     };
 
     if (selectedConta) {
-      updateContaPagar(selectedConta.id, data);
+      updateContaPagar(selectedConta.id, base);
       toast.success('Conta atualizada com sucesso!');
+    } else if (isParcelado && numParcelas > 1) {
+      addContasPagarParceladas(base, numParcelas);
+      toast.success(`${numParcelas} parcelas criadas com sucesso! 🎉`, {
+        description: `${formData.fornecedor} — ${formatCurrency(parseFloat(formData.valor))} x ${numParcelas}x`,
+      });
     } else {
-      addContaPagar(data);
+      addContaPagar(base);
       toast.success('Conta criada com sucesso!');
     }
 
@@ -114,6 +152,7 @@ export function ContasPagar() {
 
   const handleEdit = (conta: ContaPagar) => {
     setSelectedConta(conta);
+    setIsParcelado(false);
     setFormData({
       fornecedor: conta.fornecedor,
       categoria_id: conta.categoria_id,
@@ -138,12 +177,20 @@ export function ContasPagar() {
       toast.error('Selecione uma conta bancária');
       return;
     }
-
     confirmarPagamento(selectedConta.id, selectedContaBancaria);
     toast.success('Pagamento confirmado com sucesso!');
     setConfirmDialogOpen(false);
     setSelectedConta(null);
     setSelectedContaBancaria('');
+  };
+
+  const toggleGroup = (grupoId: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(grupoId)) next.delete(grupoId);
+      else next.add(grupoId);
+      return next;
+    });
   };
 
   // Filtrar contas
@@ -153,33 +200,75 @@ export function ContasPagar() {
     return true;
   });
 
+  // Agrupar: separar parceladas (por grupo) das avulsas
+  const { linhas } = useMemo(() => {
+    type Linha =
+      | { tipo: 'avulsa'; conta: ContaPagar }
+      | { tipo: 'grupo_header'; grupoId: string; parcelas: ContaPagar[]; expanded: boolean }
+      | { tipo: 'grupo_parcela'; conta: ContaPagar; grupoId: string };
+
+    const grupos = new Map<string, ContaPagar[]>();
+    const avulsas: ContaPagar[] = [];
+
+    contasFiltradas.forEach(c => {
+      if (c.grupo_parcelamento) {
+        const g = grupos.get(c.grupo_parcelamento) || [];
+        g.push(c);
+        grupos.set(c.grupo_parcelamento, g);
+      } else {
+        avulsas.push(c);
+      }
+    });
+
+    const linhas: Linha[] = [];
+
+    // Grupos primeiro (ordenados pela 1ª parcela)
+    grupos.forEach((parcelas, grupoId) => {
+      const sorted = [...parcelas].sort((a, b) => (a.parcela_atual || 0) - (b.parcela_atual || 0));
+      const isExpanded = expandedGroups.has(grupoId);
+      linhas.push({ tipo: 'grupo_header', grupoId, parcelas: sorted, expanded: isExpanded });
+      if (isExpanded) {
+        sorted.forEach(c => linhas.push({ tipo: 'grupo_parcela', conta: c, grupoId }));
+      }
+    });
+
+    // Avulsas
+    avulsas.forEach(c => linhas.push({ tipo: 'avulsa', conta: c }));
+
+    return { linhas };
+  }, [contasFiltradas, expandedGroups]);
+
   const getStatusBadge = (status: StatusDespesa) => {
     const variants = {
-      previsto: { variant: 'default' as const, label: 'Previsto', className: 'bg-blue-500 hover:bg-blue-600' },
-      pago: { variant: 'default' as const, label: 'Pago', className: 'bg-green-500 hover:bg-green-600' },
-      cancelado: { variant: 'secondary' as const, label: 'Cancelado', className: '' },
+      previsto: { label: 'Previsto', className: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+      pago: { label: 'Pago', className: 'bg-green-500/20 text-green-400 border-green-500/30' },
+      cancelado: { label: 'Cancelado', className: 'bg-muted text-muted-foreground border-border/40' },
     };
     const config = variants[status];
-    return <Badge variant={config.variant} className={config.className}>{config.label}</Badge>;
+    return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
   };
 
-  const getCategoriaNome = (categoriaId: string) => {
-    return categorias.find(c => c.id === categoriaId)?.nome || 'Categoria não encontrada';
-  };
+  const getCategoriaNome = (categoriaId: string) =>
+    categorias.find(c => c.id === categoriaId)?.nome || '—';
+
+  // Valores do preview de parcelamento
+  const valorParcela = formData.valor && numParcelas > 1
+    ? parseFloat(formData.valor) / numParcelas
+    : null;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">Contas a Pagar</h1>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+            Contas a Pagar
+          </h1>
           <p className="text-foreground/70 mt-1">Gerencie suas despesas</p>
         </div>
+
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
-          if (!open) {
-            setSelectedConta(null);
-            resetForm();
-          }
+          if (!open) { setSelectedConta(null); resetForm(); }
         }}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/20">
@@ -187,6 +276,7 @@ export function ContasPagar() {
               Nova Conta a Pagar
             </Button>
           </DialogTrigger>
+
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
@@ -196,6 +286,7 @@ export function ContasPagar() {
                 Preencha os dados da conta a pagar
               </DialogDescription>
             </DialogHeader>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -228,7 +319,9 @@ export function ContasPagar() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="valor">Valor (R$) *</Label>
+                  <Label htmlFor="valor">
+                    {isParcelado ? 'Valor Total (R$) *' : 'Valor (R$) *'}
+                  </Label>
                   <Input
                     id="valor"
                     type="number"
@@ -240,7 +333,9 @@ export function ContasPagar() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="data_vencimento">Data de Vencimento *</Label>
+                  <Label htmlFor="data_vencimento">
+                    {isParcelado ? '1ª Parcela — Vencimento *' : 'Data de Vencimento *'}
+                  </Label>
                   <Input
                     id="data_vencimento"
                     type="date"
@@ -259,22 +354,24 @@ export function ContasPagar() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value: StatusDespesa) => setFormData({ ...formData, status: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="previsto">Previsto</SelectItem>
-                      <SelectItem value="pago">Pago</SelectItem>
-                      <SelectItem value="cancelado">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {!selectedConta && (
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value: StatusDespesa) => setFormData({ ...formData, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="previsto">Previsto</SelectItem>
+                        <SelectItem value="pago">Pago</SelectItem>
+                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {formData.status === 'pago' && (
                   <div className="space-y-2">
@@ -305,24 +402,118 @@ export function ContasPagar() {
                   value={formData.descricao}
                   onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                   placeholder="Detalhes da conta a pagar..."
-                  rows={3}
+                  rows={2}
                 />
               </div>
+
+              {/* ======== SEÇÃO DE PARCELAMENTO ======== */}
+              {!selectedConta && (
+                <div className="border border-border/40 rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setIsParcelado(!isParcelado)}
+                    className={cn(
+                      'w-full flex items-center justify-between px-4 py-3 text-sm font-medium transition-all',
+                      isParcelado
+                        ? 'bg-blue-500/10 text-blue-400 border-b border-blue-500/20'
+                        : 'bg-muted/30 text-foreground/70 hover:bg-muted/50'
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Parcelar compra
+                    </span>
+                    <span className={cn(
+                      'text-xs px-2 py-0.5 rounded-full border font-semibold',
+                      isParcelado
+                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                        : 'bg-muted text-muted-foreground border-border/40'
+                    )}>
+                      {isParcelado ? 'ATIVO' : 'INATIVO'}
+                    </span>
+                  </button>
+
+                  {isParcelado && (
+                    <div className="px-4 py-4 space-y-4 bg-blue-500/5">
+                      <div className="space-y-2">
+                        <Label>Número de Parcelas</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setNumParcelas(n)}
+                              className={cn(
+                                'w-10 h-10 rounded-lg text-sm font-semibold border transition-all',
+                                numParcelas === n
+                                  ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/30'
+                                  : 'border-border/40 text-foreground/70 hover:border-blue-500/50 hover:text-blue-400'
+                              )}
+                            >
+                              {n}x
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Preview das parcelas */}
+                      {valorParcela !== null && formData.data_vencimento && (
+                        <div className="bg-card/60 border border-border/40 rounded-lg p-3 space-y-2">
+                          <p className="text-xs text-foreground/50 font-medium uppercase tracking-wide">
+                            Preview das parcelas
+                          </p>
+                          <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
+                            {Array.from({ length: numParcelas }, (_, i) => {
+                              const data = new Date(formData.data_vencimento + 'T12:00:00Z');
+                              data.setMonth(data.getMonth() + i);
+                              return (
+                                <div
+                                  key={i}
+                                  className="flex items-center justify-between bg-muted/30 rounded-md px-2.5 py-1.5 text-xs"
+                                >
+                                  <span className="text-foreground/60">
+                                    Parcela {i + 1}/{numParcelas}
+                                  </span>
+                                  <div className="text-right">
+                                    <span className="text-blue-400 font-semibold">
+                                      {formatCurrency(valorParcela)}
+                                    </span>
+                                    <span className="block text-foreground/40 text-[10px]">
+                                      {data.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="flex justify-between pt-1 border-t border-border/30 text-xs">
+                            <span className="text-foreground/50">Total</span>
+                            <span className="text-foreground font-bold">
+                              {formatCurrency(parseFloat(formData.valor))}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* ======================================= */}
 
               <DialogFooter>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    setDialogOpen(false);
-                    setSelectedConta(null);
-                    resetForm();
-                  }}
+                  onClick={() => { setDialogOpen(false); setSelectedConta(null); resetForm(); }}
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" className="bg-[#2B6CB0] hover:bg-[#2B6CB0]/90">
-                  {selectedConta ? 'Atualizar' : 'Criar'}
+                <Button type="submit" className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700">
+                  {selectedConta
+                    ? 'Atualizar'
+                    : isParcelado
+                    ? `Criar ${numParcelas} parcelas`
+                    : 'Criar conta'}
                 </Button>
               </DialogFooter>
             </form>
@@ -354,7 +545,6 @@ export function ContasPagar() {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Categoria</Label>
               <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
@@ -392,7 +582,7 @@ export function ContasPagar() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {contasFiltradas.length === 0 ? (
+                {linhas.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-64 text-center">
                       <div className="flex flex-col items-center justify-center space-y-4 py-8">
@@ -409,63 +599,216 @@ export function ContasPagar() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  contasFiltradas.map((conta) => (
-                    <TableRow
-                      key={conta.id}
-                      className={
-                        conta.status === 'previsto' && isDatePast(conta.data_vencimento)
-                          ? 'bg-red-500/10 border-border/40 hover:bg-red-500/15'
-                          : 'border-border/40 hover:bg-muted/30'
-                      }
-                    >
-                      <TableCell className="font-medium text-foreground">
-                        {conta.fornecedor}
-                      </TableCell>
-                      <TableCell className="text-foreground/80">
-                        {getCategoriaNome(conta.categoria_id)}
-                      </TableCell>
-                      <TableCell className="font-semibold text-red-400">
-                        {formatCurrency(conta.valor)}
-                      </TableCell>
-                      <TableCell className="text-foreground/80">
-                        {formatDate(conta.data_vencimento)}
-                        {conta.status === 'previsto' && isDatePast(conta.data_vencimento) && (
-                          <Badge variant="destructive" className="ml-2 text-xs">
-                            Vencido
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-foreground/80">
-                        {conta.competencia.split('-').reverse().join('/')}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(conta.status)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {conta.status === 'previsto' && (
+                  linhas.map((linha, idx) => {
+                    // ---- GRUPO HEADER ----
+                    if (linha.tipo === 'grupo_header') {
+                      const { grupoId, parcelas, expanded } = linha;
+                      const totalPago = parcelas.filter(p => p.status === 'pago').length;
+                      const totalParcelas = parcelas[0]?.total_parcelas || parcelas.length;
+                      const valorParcela = parcelas[0]?.valor || 0;
+                      const fornecedor = parcelas[0]?.fornecedor || '—';
+                      const catId = parcelas[0]?.categoria_id || '';
+                      const algumVencido = parcelas.some(p => p.status === 'previsto' && isDatePast(p.data_vencimento));
+                      const proximaParcela = parcelas.find(p => p.status === 'previsto');
+
+                      return (
+                        <TableRow
+                          key={`grupo-${grupoId}`}
+                          className={cn(
+                            'border-border/40 cursor-pointer select-none transition-colors',
+                            algumVencido ? 'bg-red-500/5 hover:bg-red-500/10' : 'hover:bg-blue-500/5'
+                          )}
+                          onClick={() => toggleGroup(grupoId)}
+                        >
+                          <TableCell className="font-semibold text-foreground">
+                            <div className="flex items-center gap-2">
+                              {expanded ? (
+                                <ChevronDown className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                              )}
+                              <span>{fornecedor}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-foreground/80">
+                            {getCategoriaNome(catId)}
+                          </TableCell>
+                          <TableCell className="font-semibold text-red-400">
+                            {formatCurrency(valorParcela)}
+                            <span className="text-foreground/40 text-xs ml-1">/ parcela</span>
+                          </TableCell>
+                          <TableCell className="text-foreground/80">
+                            {proximaParcela ? formatDate(proximaParcela.data_vencimento) : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className="gap-1 items-center border-blue-500/30 text-blue-400 bg-blue-500/10"
+                            >
+                              <Layers className="h-3 w-3" />
+                              {totalPago}/{totalParcelas} pagas
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {algumVencido ? (
+                              <Badge variant="destructive" className="text-xs">Parcela vencida</Badge>
+                            ) : totalPago === totalParcelas ? (
+                              <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">Quitado</Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">Em aberto</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="text-xs text-foreground/40">
+                              {expanded ? 'Recolher' : 'Expandir'}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    // ---- PARCELA INDIVIDUAL (dentro do grupo expandido) ----
+                    if (linha.tipo === 'grupo_parcela') {
+                      const { conta } = linha;
+                      return (
+                        <TableRow
+                          key={conta.id}
+                          className={cn(
+                            'border-border/20 bg-muted/10',
+                            conta.status === 'previsto' && isDatePast(conta.data_vencimento)
+                              ? 'bg-red-500/10 hover:bg-red-500/15'
+                              : 'hover:bg-muted/20'
+                          )}
+                        >
+                          <TableCell className="pl-10 text-foreground/70 text-sm">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                                {conta.parcela_atual}
+                              </span>
+                              Parcela {conta.parcela_atual}/{conta.total_parcelas}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-foreground/60 text-sm">
+                            {getCategoriaNome(conta.categoria_id)}
+                          </TableCell>
+                          <TableCell className="font-semibold text-red-400 text-sm">
+                            {formatCurrency(conta.valor)}
+                          </TableCell>
+                          <TableCell className="text-foreground/70 text-sm">
+                            {formatDate(conta.data_vencimento)}
+                            {conta.status === 'previsto' && isDatePast(conta.data_vencimento) && (
+                              <Badge variant="destructive" className="ml-2 text-xs">Vencido</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-foreground/60 text-sm">
+                            {conta.competencia.split('-').reverse().join('/')}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(conta.status)}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {conta.status === 'previsto' && (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="bg-green-600 hover:bg-green-700 h-7 text-xs shadow-md"
+                                  onClick={(e) => { e.stopPropagation(); handleConfirmarPagamento(conta); }}
+                                >
+                                  <Check className="h-3 w-3 mr-1" />
+                                  Pagar
+                                </Button>
+                              )}
+                              {conta.status === 'pago' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-green-500/40 text-green-400 hover:bg-green-500/10 h-7 text-xs gap-1"
+                                  onClick={(e) => { e.stopPropagation(); handleVoucherPagamento(conta); }}
+                                >
+                                  <FileDown className="h-3 w-3" />
+                                  Comprovante
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-border/40 h-7 w-7 p-0"
+                                onClick={(e) => { e.stopPropagation(); handleEdit(conta); }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    // ---- CONTA AVULSA ----
+                    const { conta } = linha as { tipo: 'avulsa'; conta: ContaPagar };
+                    return (
+                      <TableRow
+                        key={conta.id}
+                        className={
+                          conta.status === 'previsto' && isDatePast(conta.data_vencimento)
+                            ? 'bg-red-500/10 border-border/40 hover:bg-red-500/15'
+                            : 'border-border/40 hover:bg-muted/30'
+                        }
+                      >
+                        <TableCell className="font-medium text-foreground">
+                          {conta.fornecedor}
+                        </TableCell>
+                        <TableCell className="text-foreground/80">
+                          {getCategoriaNome(conta.categoria_id)}
+                        </TableCell>
+                        <TableCell className="font-semibold text-red-400">
+                          {formatCurrency(conta.valor)}
+                        </TableCell>
+                        <TableCell className="text-foreground/80">
+                          {formatDate(conta.data_vencimento)}
+                          {conta.status === 'previsto' && isDatePast(conta.data_vencimento) && (
+                            <Badge variant="destructive" className="ml-2 text-xs">Vencido</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-foreground/80">
+                          {conta.competencia.split('-').reverse().join('/')}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(conta.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {conta.status === 'previsto' && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="bg-green-600 hover:bg-green-700 shadow-md"
+                                onClick={() => handleConfirmarPagamento(conta)}
+                              >
+                                <Check className="h-4 w-4 mr-1" />
+                                Confirmar
+                              </Button>
+                            )}
+                            {conta.status === 'pago' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-green-500/40 text-green-400 hover:bg-green-500/10 gap-1"
+                                onClick={() => handleVoucherPagamento(conta)}
+                              >
+                                <FileDown className="h-4 w-4" />
+                                Comprovante
+                              </Button>
+                            )}
                             <Button
                               size="sm"
-                              variant="default"
-                              className="bg-green-600 hover:bg-green-700 shadow-md"
-                              onClick={() => handleConfirmarPagamento(conta)}
+                              variant="outline"
+                              className="border-border/40"
+                              onClick={() => handleEdit(conta)}
                             >
-                              <Check className="h-4 w-4 mr-1" />
-                              Confirmar
+                              <Pencil className="h-4 w-4" />
                             </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-border/40"
-                            onClick={() => handleEdit(conta)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -499,10 +842,27 @@ export function ContasPagar() {
               </Select>
             </div>
             {selectedConta && (
-              <div className="p-4 bg-muted/30 rounded-lg border border-border/40 space-y-1">
-                <p className="text-sm text-foreground"><strong>Fornecedor:</strong> {selectedConta.fornecedor}</p>
-                <p className="text-sm text-foreground"><strong>Valor:</strong> {formatCurrency(selectedConta.valor)}</p>
-                <p className="text-sm text-foreground"><strong>Vencimento:</strong> {formatDate(selectedConta.data_vencimento)}</p>
+              <div className="p-4 bg-muted/30 rounded-lg border border-border/40 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-foreground/60">Fornecedor</span>
+                  <span className="font-medium text-foreground">{selectedConta.fornecedor}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-foreground/60">Valor</span>
+                  <span className="font-semibold text-red-400">{formatCurrency(selectedConta.valor)}</span>
+                </div>
+                {selectedConta.parcela_atual && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-foreground/60">Parcela</span>
+                    <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10 text-xs">
+                      {selectedConta.parcela_atual}/{selectedConta.total_parcelas}
+                    </Badge>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-foreground/60">Vencimento</span>
+                  <span className="text-foreground">{formatDate(selectedConta.data_vencimento)}</span>
+                </div>
               </div>
             )}
           </div>
@@ -510,10 +870,7 @@ export function ContasPagar() {
             <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button
-              className="bg-green-600 hover:bg-green-700"
-              onClick={confirmarPagamentoAction}
-            >
+            <Button className="bg-green-600 hover:bg-green-700" onClick={confirmarPagamentoAction}>
               Confirmar Pagamento
             </Button>
           </DialogFooter>

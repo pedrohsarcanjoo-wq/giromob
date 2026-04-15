@@ -94,6 +94,11 @@ model Transaction {
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Parcelamento
+  installmentNumber    Int?    // Número da parcela (ex: 1, 2, 3)
+  totalInstallments    Int?    // Total de parcelas (ex: 6, 12)
+  installmentGroupId   String? // UUID que agrupa todas as parcelas de uma mesma compra
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

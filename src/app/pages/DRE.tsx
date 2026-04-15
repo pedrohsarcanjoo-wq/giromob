@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
+import { gerarDREPDF } from '../utils/pdfGenerator';
 import {
   Table,
   TableBody,
@@ -13,11 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table';
-import { FileDown } from 'lucide-react';
+import { FileDown, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function DRE() {
   const { contasReceber, contasPagar, categorias } = useApp();
+  const [isExporting, setIsExporting] = useState(false);
 
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
@@ -63,9 +65,28 @@ export function DRE() {
 
   const resultadoLiquido = lucroBruto - totalDespesasAdministrativas - totalDespesasFinanceiras;
 
-  const handleExportPDF = () => {
-    toast.success('Função de exportação em desenvolvimento');
-    // Aqui seria implementada a lógica de exportação
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      await new Promise(r => setTimeout(r, 100)); // garante render
+      gerarDREPDF({
+        periodo: getMonthName(selectedMonth),
+        receitaBruta,
+        custosOperacionais,
+        totalCustosOperacionais,
+        lucroBruto,
+        despesasAdministrativas,
+        totalDespesasAdministrativas,
+        despesasFinanceiras,
+        totalDespesasFinanceiras,
+        resultadoLiquido,
+      });
+      toast.success('DRE exportado com sucesso!');
+    } catch {
+      toast.error('Erro ao gerar o PDF.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -89,10 +110,15 @@ export function DRE() {
           <Button
             variant="outline"
             onClick={handleExportPDF}
-            className="mt-6 border-border/40"
+            disabled={isExporting}
+            className="mt-6 border-border/40 gap-2"
           >
-            <FileDown className="h-4 w-4 mr-2" />
-            Exportar PDF
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            {isExporting ? 'Gerando...' : 'Exportar PDF'}
           </Button>
         </div>
       </div>

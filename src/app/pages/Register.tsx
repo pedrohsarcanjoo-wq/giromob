@@ -3,7 +3,9 @@ import { useNavigate, Link } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { toast } from 'sonner';
-import { Wallet, Mail, Lock, User as UserIcon, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, ArrowRight, Loader2 } from 'lucide-react';
+import logoClara from '../../assets/logo-clara.png';
+import logoEscura from '../../assets/logo-escura.png';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 
@@ -53,10 +55,9 @@ export function Register() {
           
           {/* Header */}
           <div className="flex flex-col items-center justify-center mb-8 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center p-0.5 mb-6 shadow-lg shadow-blue-500/30">
-              <div className="w-full h-full bg-card/90 rounded-2xl backdrop-blur-sm flex items-center justify-center">
-                <Wallet className="h-8 w-8 text-blue-400" />
-              </div>
+            <div className="mb-6">
+              <img src={logoClara} alt="GiroMob" className="h-16 w-auto dark:hidden" />
+              <img src={logoEscura} alt="GiroMob" className="h-16 w-auto hidden dark:block" />
             </div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent mb-2">Comece a usar</h1>
             <p className="text-muted-foreground text-sm">Crie sua conta para gerenciar seu financeiro.</p>

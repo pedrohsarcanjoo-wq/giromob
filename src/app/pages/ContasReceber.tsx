@@ -31,9 +31,10 @@ import {
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Plus, Check, Pencil, Filter, Inbox } from 'lucide-react';
+import { Plus, Check, Pencil, Filter, Inbox, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { ContaReceber, StatusReceita } from '../types';
+import { gerarVoucherFatura } from '../utils/pdfGenerator';
 
 export function ContasReceber() {
   const { 
@@ -44,6 +45,27 @@ export function ContasReceber() {
     updateContaReceber,
     confirmarRecebimento,
   } = useApp();
+
+  const getClienteNome = (clienteId: string) =>
+    clientes.find(c => c.id === clienteId)?.nome || 'Cliente não encontrado';
+
+  const getContaBancariaName = (id?: string) =>
+    id ? (contasBancarias.find(c => c.id === id)?.nome || id) : undefined;
+
+  const handleVoucherFatura = (conta: ContaReceber) => {
+    gerarVoucherFatura({
+      id: conta.id,
+      cliente: getClienteNome(conta.cliente_id),
+      descricao: conta.descricao,
+      valor: conta.valor,
+      data_vencimento: conta.data_vencimento,
+      data_recebimento: conta.data_recebimento,
+      status: conta.status,
+      conta_bancaria: getContaBancariaName(conta.conta_bancaria_id),
+      competencia: conta.competencia,
+    });
+    toast.success('Fatura gerada com sucesso!');
+  };
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -157,10 +179,6 @@ export function ContasReceber() {
     };
     const config = variants[status];
     return <Badge variant={config.variant} className={config.className}>{config.label}</Badge>;
-  };
-
-  const getClienteNome = (clienteId: string) => {
-    return clientes.find(c => c.id === clienteId)?.nome || 'Cliente não encontrado';
   };
 
   return (
@@ -440,6 +458,16 @@ export function ContasReceber() {
                               Confirmar
                             </Button>
                           )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-blue-500/40 text-blue-400 hover:bg-blue-500/10 gap-1"
+                            onClick={() => handleVoucherFatura(conta)}
+                            title="Gerar fatura em PDF"
+                          >
+                            <FileDown className="h-4 w-4" />
+                            Fatura
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"

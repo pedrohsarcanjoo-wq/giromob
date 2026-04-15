@@ -297,7 +297,11 @@ router.get('/contas-pagar', async (req, res) => {
     status: db.status === 'PAID' ? 'pago' : (db.status === 'CANCELLED' ? 'cancelado' : 'previsto'),
     conta_bancaria_id: db.bankAccountId || undefined,
     competencia: db.dueDate.toISOString().substring(0, 7),
-    created_at: db.createdAt
+    created_at: db.createdAt,
+    // Parcelamento
+    parcela_atual: db.installmentNumber || undefined,
+    total_parcelas: db.totalInstallments || undefined,
+    grupo_parcelamento: db.installmentGroupId || undefined,
   }));
   res.json(formated);
 });
@@ -327,10 +331,65 @@ router.post('/contas-pagar', async (req, res) => {
       paymentDate: f.data_pagamento ? new Date(f.data_pagamento + 'T12:00:00Z') : null,
       clientSupplierId: supplier ? supplier.id : undefined,
       bankAccountId: f.conta_bancaria_id,
-      categoryId: f.categoria_id
+      categoryId: f.categoria_id,
+      // Parcelamento
+      installmentNumber: f.parcela_atual || null,
+      totalInstallments: f.total_parcelas || null,
+      installmentGroupId: f.grupo_parcelamento || null,
     }
   });
+  });
   res.json(db);
+});
+
+router.post('/contas-pagar/bulk', async (req, res) => {
+  const userId = (req as any).userId;
+  const { parcelas } = req.body;
+
+  if (!parcelas || !Array.isArray(parcelas) || parcelas.length === 0) {
+    return res.status(400).json({ error: 'Nenhuma parcela fornecida.' });
+  }
+
+  try {
+    // Tenta achar ou criar o Fornecedor com base na primeira parcela
+    // Já que todas partilham do mesmo fornecedor num parcelamento.
+    const fPrimeira = parcelas[0];
+    let supplier = null;
+    if (fPrimeira.fornecedor) {
+      supplier = await prisma.clientSupplier.findFirst({ where: { userId, name: fPrimeira.fornecedor } });
+      if (!supplier) {
+        supplier = await prisma.clientSupplier.create({ data: { userId, name: fPrimeira.fornecedor, type: 'SUPPLIER' } });
+      }
+    }
+
+    // Mapeando a estrutura da request para Prisma
+    const dadosInsercao = parcelas.map((f: any) => ({
+      userId,
+      id: f.id,
+      description: f.descricao || 'Pagamento',
+      amount: Math.round(f.valor * 100),
+      type: 'OUT',
+      status: f.status === 'pago' ? 'PAID' : 'PENDING',
+      dueDate: new Date(f.data_vencimento + 'T12:00:00Z'),
+      paymentDate: f.data_pagamento ? new Date(f.data_pagamento + 'T12:00:00Z') : null,
+      clientSupplierId: supplier ? supplier.id : undefined,
+      bankAccountId: f.conta_bancaria_id,
+      categoryId: f.categoria_id,
+      installmentNumber: f.parcela_atual || null,
+      totalInstallments: f.total_parcelas || null,
+      installmentGroupId: f.grupo_parcelamento || null,
+    }));
+
+    // Cria as transações numa operação bulk "Tudo ou Nada"
+    const count = await prisma.transaction.createMany({
+      data: dadosInsercao
+    });
+
+    res.json({ success: true, count: count.count });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao gerar parcelas em lote.' });
+  }
 });
 
 router.put('/contas-pagar/:id', async (req, res) => {

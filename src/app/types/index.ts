@@ -56,4 +56,8 @@ export interface ContaPagar {
   conta_bancaria_id?: string;
   competencia: string; // YYYY-MM
   created_at: string;
+  // Parcelamento
+  parcela_atual?: number;   // ex: 1, 2, 3...
+  total_parcelas?: number;  // ex: 6, 12...
+  grupo_parcelamento?: string; // UUID que agrupa todas as parcelas
 }
