@@ -1,4 +1,6 @@
 import { Link, useLocation } from 'react-router';
+import logoClara from '../../assets/logo-clara.png';
+import logoEscura from '../../assets/logo-escura.png';
 import {
   LayoutDashboard,
   TrendingUp,
@@ -58,8 +60,8 @@ export function Sidebar() {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <img src="/logo-clara.png" alt="GiroMob" className="h-8 dark:hidden" />
-            <img src="/logo-escura.png" alt="GiroMob" className="h-8 hidden dark:block" />
+            <img src={logoClara} alt="GiroMob" className="h-8 dark:hidden" />
+            <img src={logoEscura} alt="GiroMob" className="h-8 hidden dark:block" />
           </div>
         </div>
         <div className="flex items-center gap-3">
