@@ -60,8 +60,8 @@ export function Sidebar() {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <img src={logoClara} alt="GiroMob" className="h-8 dark:hidden" />
-            <img src={logoEscura} alt="GiroMob" className="h-8 hidden dark:block" />
+            <img src={logoEscura} alt="GiroMob" className="h-8 dark:hidden" />
+            <img src={logoClara} alt="GiroMob" className="h-8 hidden dark:block" />
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -90,8 +90,8 @@ export function Sidebar() {
           {/* Header */}
           <div className="p-6 border-b border-sidebar-border">
             <div className="flex items-center justify-center mb-4">
-              <img src={logoClara} alt="GiroMob" className="h-12 w-auto dark:hidden" />
-              <img src={logoEscura} alt="GiroMob" className="h-12 w-auto hidden dark:block" />
+              <img src={logoEscura} alt="GiroMob" className="h-12 w-auto dark:hidden" />
+              <img src={logoClara} alt="GiroMob" className="h-12 w-auto hidden dark:block" />
             </div>
           </div>
 

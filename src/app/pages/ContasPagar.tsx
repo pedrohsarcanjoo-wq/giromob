@@ -31,7 +31,7 @@ import {
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Plus, Check, Pencil, Filter, Inbox, CreditCard, Layers, ChevronDown, ChevronRight, FileDown } from 'lucide-react';
+import { Plus, Check, Pencil, Filter, Inbox, CreditCard, Layers, ChevronDown, ChevronRight, FileDown, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ContaPagar, StatusDespesa } from '../types';
 import { cn } from '../components/ui/utils';
@@ -45,8 +45,18 @@ export function ContasPagar() {
     addContaPagar,
     addContasPagarParceladas,
     updateContaPagar,
+    updateContaPagar,
     confirmarPagamento,
+    deleteContaPagar,
   } = useApp();
+
+  const handleDelete = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm('Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.')) {
+      deleteContaPagar(id);
+      toast.success('Conta excluída com sucesso!');
+    }
+  };
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -733,8 +743,18 @@ export function ContasPagar() {
                                 variant="outline"
                                 className="border-border/40 h-7 w-7 p-0"
                                 onClick={(e) => { e.stopPropagation(); handleEdit(conta); }}
+                                title="Editar"
                               >
                                 <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-500/40 text-red-400 hover:bg-red-500/10 h-7 w-7 p-0"
+                                onClick={(e) => handleDelete(conta.id, e)}
+                                title="Excluir"
+                              >
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
                           </TableCell>
@@ -799,10 +819,20 @@ export function ContasPagar() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-border/40"
-                              onClick={() => handleEdit(conta)}
+                              className="border-border/40 h-8 w-8 p-0 ml-1"
+                              onClick={(e) => { e.stopPropagation(); handleEdit(conta); }}
+                              title="Editar"
                             >
-                              <Pencil className="h-4 w-4" />
+                              <Pencil className="h-4 w-4 text-foreground/70" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-red-500/40 text-red-500 hover:bg-red-500/10 h-8 w-8 p-0 ml-1"
+                              onClick={(e) => { e.stopPropagation(); deleteContaPagar(conta.id); }}
+                              title="Excluir"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>

@@ -22,12 +22,20 @@ import {
 } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Plus, Pencil, Power, PowerOff, Wallet } from 'lucide-react';
+import { Plus, Pencil, Power, PowerOff, Wallet, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ContaBancaria, TipoConta } from '../types';
 
 export function ContasBancarias() {
-  const { contasBancarias, contasReceber, contasPagar, addContaBancaria, updateContaBancaria } = useApp();
+  const { contasBancarias, contasReceber, contasPagar, addContaBancaria, updateContaBancaria, deleteContaBancaria } = useApp();
+
+  const handleDelete = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm('Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita e pode afetar lançamentos que utilizavam esta conta.')) {
+      deleteContaBancaria(id);
+      toast.success('Conta excluída com sucesso!');
+    }
+  };
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<ContaBancaria | null>(null);
@@ -300,6 +308,15 @@ export function ContasBancarias() {
                       ) : (
                         <Power className="h-4 w-4" />
                       )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-500/40 text-red-500 hover:bg-red-500/10"
+                      onClick={(e) => handleDelete(conta.id, e)}
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardContent>

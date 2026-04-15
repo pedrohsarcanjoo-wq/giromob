@@ -56,8 +56,8 @@ export function Register() {
           {/* Header */}
           <div className="flex flex-col items-center justify-center mb-8 text-center">
             <div className="mb-6">
-              <img src={logoClara} alt="GiroMob" className="h-16 w-auto dark:hidden" />
-              <img src={logoEscura} alt="GiroMob" className="h-16 w-auto hidden dark:block" />
+              <img src={logoEscura} alt="GiroMob" className="h-16 w-auto dark:hidden" />
+              <img src={logoClara} alt="GiroMob" className="h-16 w-auto hidden dark:block" />
             </div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent mb-2">Comece a usar</h1>
             <p className="text-muted-foreground text-sm">Crie sua conta para gerenciar seu financeiro.</p>

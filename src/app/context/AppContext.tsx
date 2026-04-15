@@ -19,24 +19,29 @@ interface AppContextType {
   // Contas Bancárias
   addContaBancaria: (conta: Omit<ContaBancaria, 'id' | 'created_at'>) => void;
   updateContaBancaria: (id: string, conta: Partial<ContaBancaria>) => void;
+  deleteContaBancaria: (id: string) => void;
   
   // Clientes
   addCliente: (cliente: Omit<Cliente, 'id' | 'created_at'>) => void;
   updateCliente: (id: string, cliente: Partial<Cliente>) => void;
+  deleteCliente: (id: string) => void;
   
   // Categorias
   addCategoria: (categoria: Omit<CategoriaCusto, 'id' | 'created_at'>) => void;
   updateCategoria: (id: string, categoria: Partial<CategoriaCusto>) => void;
+  deleteCategoria: (id: string) => void;
   
   // Contas a Receber
   addContaReceber: (conta: Omit<ContaReceber, 'id' | 'created_at'>) => void;
   updateContaReceber: (id: string, conta: Partial<ContaReceber>) => void;
+  deleteContaReceber: (id: string) => void;
   confirmarRecebimento: (id: string, contaBancariaId: string) => void;
   
   // Contas a Pagar
   addContaPagar: (conta: Omit<ContaPagar, 'id' | 'created_at'>) => void;
   addContasPagarParceladas: (conta: Omit<ContaPagar, 'id' | 'created_at' | 'parcela_atual' | 'total_parcelas' | 'grupo_parcelamento'>, totalParcelas: number) => void;
   updateContaPagar: (id: string, conta: Partial<ContaPagar>) => void;
+  deleteContaPagar: (id: string) => void;
   confirmarPagamento: (id: string, contaBancariaId: string) => void;
 }
 
@@ -86,6 +91,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     api.put(`/contas-bancarias/${id}`, updates).catch(() => {});
   };
 
+  const deleteContaBancaria = (id: string) => {
+    setContasBancarias(contasBancarias.filter(c => c.id !== id));
+    api.delete(`/contas-bancarias/${id}`).catch(() => {});
+  };
+
   // Clientes
   const addCliente = (cliente: Omit<Cliente, 'id' | 'created_at'>) => {
     const novoCliente = { ...cliente, id: generateId(), created_at: new Date().toISOString() } as Cliente;
@@ -96,6 +106,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateCliente = (id: string, updates: Partial<Cliente>) => {
     setClientes(clientes.map(c => c.id === id ? { ...c, ...updates } as Cliente : c));
     api.put(`/clientes/${id}`, updates).catch(() => {});
+  };
+
+  const deleteCliente = (id: string) => {
+    setClientes(clientes.filter(c => c.id !== id));
+    api.delete(`/clientes/${id}`).catch(() => {});
   };
 
   // Categorias
@@ -110,6 +125,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     api.put(`/categorias/${id}`, updates).catch(() => {});
   };
 
+  const deleteCategoria = (id: string) => {
+    setCategorias(categorias.filter(c => c.id !== id));
+    api.delete(`/categorias/${id}`).catch(() => {});
+  };
+
   // Contas a Receber
   const addContaReceber = (conta: Omit<ContaReceber, 'id' | 'created_at'>) => {
     const novaConta = { ...conta, id: generateId(), created_at: new Date().toISOString() } as ContaReceber;
@@ -120,6 +140,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateContaReceber = (id: string, updates: Partial<ContaReceber>) => {
     setContasReceber(contasReceber.map(c => c.id === id ? { ...c, ...updates } as ContaReceber : c));
     api.put(`/contas-receber/${id}`, updates).catch(() => {});
+  };
+
+  const deleteContaReceber = (id: string) => {
+    setContasReceber(contasReceber.filter(c => c.id !== id));
+    api.delete(`/contas-receber/${id}`).catch(() => {});
   };
 
   const confirmarRecebimento = (id: string, contaBancariaId: string) => {
@@ -147,6 +172,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateContaPagar = (id: string, updates: Partial<ContaPagar>) => {
     setContasPagar(contasPagar.map(c => c.id === id ? { ...c, ...updates } as ContaPagar : c));
     api.put(`/contas-pagar/${id}`, updates).catch(() => {});
+  };
+
+  const deleteContaPagar = (id: string) => {
+    setContasPagar(contasPagar.filter(c => c.id !== id));
+    api.delete(`/contas-pagar/${id}`).catch(() => {});
   };
 
   const addContasPagarParceladas = (conta: Omit<ContaPagar, 'id' | 'created_at' | 'parcela_atual' | 'total_parcelas' | 'grupo_parcelamento'>, totalParcelas: number) => {
@@ -206,16 +236,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       contasPagar,
       addContaBancaria,
       updateContaBancaria,
+      deleteContaBancaria,
       addCliente,
       updateCliente,
+      deleteCliente,
       addCategoria,
       updateCategoria,
+      deleteCategoria,
       addContaReceber,
       updateContaReceber,
+      deleteContaReceber,
       confirmarRecebimento,
       addContaPagar,
       addContasPagarParceladas,
       updateContaPagar,
+      deleteContaPagar,
       confirmarPagamento,
     }}>
       {children}

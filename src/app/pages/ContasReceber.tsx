@@ -31,7 +31,7 @@ import {
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Plus, Check, Pencil, Filter, Inbox, FileDown } from 'lucide-react';
+import { Plus, Check, Pencil, Filter, Inbox, FileDown, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ContaReceber, StatusReceita } from '../types';
 import { gerarVoucherFatura } from '../utils/pdfGenerator';
@@ -42,9 +42,18 @@ export function ContasReceber() {
     clientes, 
     contasBancarias,
     addContaReceber, 
+    addContaReceber, 
     updateContaReceber,
     confirmarRecebimento,
+    deleteContaReceber,
   } = useApp();
+
+  const handleDelete = (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.')) {
+      deleteContaReceber(id);
+      toast.success('Conta excluída com sucesso!');
+    }
+  };
 
   const getClienteNome = (clienteId: string) =>
     clientes.find(c => c.id === clienteId)?.nome || 'Cliente não encontrado';
@@ -472,8 +481,18 @@ export function ContasReceber() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleEdit(conta)}
+                            title="Editar"
                           >
                             <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-red-500/40 text-red-500 hover:bg-red-500/10"
+                            onClick={() => handleDelete(conta.id)}
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>

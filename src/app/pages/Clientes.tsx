@@ -22,12 +22,19 @@ import {
 } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Plus, Pencil, Power, PowerOff, Inbox } from 'lucide-react';
+import { Plus, Pencil, Power, PowerOff, Inbox, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Cliente } from '../types';
 
 export function Clientes() {
-  const { clientes, addCliente, updateCliente } = useApp();
+  const { clientes, addCliente, updateCliente, deleteCliente } = useApp();
+
+  const handleDelete = (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este cliente/fornecedor? Esta ação não pode ser desfeita.')) {
+      deleteCliente(id);
+      toast.success('Cliente excluído com sucesso!');
+    }
+  };
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
@@ -257,6 +264,15 @@ export function Clientes() {
                             ) : (
                               <Power className="h-4 w-4" />
                             )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-red-500/40 text-red-500 hover:bg-red-500/10"
+                            onClick={() => handleDelete(cliente.id)}
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>

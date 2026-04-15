@@ -29,12 +29,19 @@ import {
 } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Plus, Pencil, Power, PowerOff, Inbox } from 'lucide-react';
+import { Plus, Pencil, Power, PowerOff, Inbox, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CategoriaCusto, TipoCategoria } from '../types';
 
 export function Categorias() {
-  const { categorias, addCategoria, updateCategoria } = useApp();
+  const { categorias, addCategoria, updateCategoria, deleteCategoria } = useApp();
+
+  const handleDelete = (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir esta categoria? Esta ação não pode ser desfeita.')) {
+      deleteCategoria(id);
+      toast.success('Categoria excluída com sucesso!');
+    }
+  };
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCategoria, setSelectedCategoria] = useState<CategoriaCusto | null>(null);
@@ -279,6 +286,15 @@ export function Categorias() {
                             ) : (
                               <Power className="h-4 w-4" />
                             )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-red-500/40 text-red-500 hover:bg-red-500/10"
+                            onClick={() => handleDelete(categoria.id)}
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>

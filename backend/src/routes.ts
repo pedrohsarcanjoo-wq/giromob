@@ -112,6 +112,16 @@ router.put('/contas-bancarias/:id', async (req, res) => {
   res.json(db);
 });
 
+router.delete('/contas-bancarias/:id', async (req, res) => {
+  const userId = (req as any).userId;
+  const { id } = req.params;
+  const exists = await prisma.bankAccount.findFirst({ where: { id, userId } });
+  if (!exists) { res.status(404).json({ error: 'Não encontrado' }); return; }
+
+  await prisma.bankAccount.delete({ where: { id } });
+  res.json({ success: true });
+});
+
 // ======== CLIENTES ========
 router.get('/clientes', async (req, res) => {
   const userId = (req as any).userId;
@@ -164,6 +174,16 @@ router.put('/clientes/:id', async (req, res) => {
   res.json(db);
 });
 
+router.delete('/clientes/:id', async (req, res) => {
+  const userId = (req as any).userId;
+  const { id } = req.params;
+  const exists = await prisma.clientSupplier.findFirst({ where: { id, userId } });
+  if (!exists) { res.status(404).json({ error: 'Não encontrado' }); return; }
+
+  await prisma.clientSupplier.delete({ where: { id } });
+  res.json({ success: true });
+});
+
 // ======== CATEGORIAS ========
 router.get('/categorias', async (req, res) => {
   const userId = (req as any).userId;
@@ -211,6 +231,16 @@ router.put('/categorias/:id', async (req, res) => {
     }
   });
   res.json(db);
+});
+
+router.delete('/categorias/:id', async (req, res) => {
+  const userId = (req as any).userId;
+  const { id } = req.params;
+  const exists = await prisma.category.findFirst({ where: { id, userId } });
+  if (!exists) { res.status(404).json({ error: 'Não encontrado' }); return; }
+
+  await prisma.category.delete({ where: { id } });
+  res.json({ success: true });
 });
 
 // ======== CONTAS A RECEBER ========
@@ -277,6 +307,16 @@ router.put('/contas-receber/:id', async (req, res) => {
 
   const db = await prisma.transaction.update({ where: { id }, data });
   res.json(db);
+});
+
+router.delete('/contas-receber/:id', async (req, res) => {
+  const userId = (req as any).userId;
+  const { id } = req.params;
+  const exists = await prisma.transaction.findFirst({ where: { id, userId } });
+  if (!exists) { res.status(404).json({ error: 'Não encontrado' }); return; }
+
+  await prisma.transaction.delete({ where: { id } });
+  res.json({ success: true });
 });
 
 // ======== CONTAS A PAGAR ========
@@ -409,6 +449,16 @@ router.put('/contas-pagar/:id', async (req, res) => {
 
   const db = await prisma.transaction.update({ where: { id }, data });
   res.json(db);
+});
+
+router.delete('/contas-pagar/:id', async (req, res) => {
+  const userId = (req as any).userId;
+  const { id } = req.params;
+  const exists = await prisma.transaction.findFirst({ where: { id, userId } });
+  if (!exists) { res.status(404).json({ error: 'Não encontrado' }); return; }
+
+  await prisma.transaction.delete({ where: { id } });
+  res.json({ success: true });
 });
 
 export default router;
