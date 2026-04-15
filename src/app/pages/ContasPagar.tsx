@@ -45,7 +45,6 @@ export function ContasPagar() {
     addContaPagar,
     addContasPagarParceladas,
     updateContaPagar,
-    updateContaPagar,
     confirmarPagamento,
     deleteContaPagar,
   } = useApp();
