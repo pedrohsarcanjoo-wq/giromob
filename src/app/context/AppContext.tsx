@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { api } from '../utils/api';
+import { useAuth } from './AuthContext';
 import {
   ContaBancaria,
   Cliente,
@@ -48,14 +49,24 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
- const [contasBancarias, setContasBancarias] = useState<ContaBancaria[]>([]);
- const [clientes, setClientes] = useState<Cliente[]>([]);
- const [categorias, setCategorias] = useState<CategoriaCusto[]>([]);
- const [contasReceber, setContasReceber] = useState<ContaReceber[]>([]);
- const [contasPagar, setContasPagar] = useState<ContaPagar[]>([]);
+  const { user } = useAuth();
 
+  const [contasBancarias, setContasBancarias] = useState<ContaBancaria[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaCusto[]>([]);
+  const [contasReceber, setContasReceber] = useState<ContaReceber[]>([]);
+  const [contasPagar, setContasPagar] = useState<ContaPagar[]>([]);
 
   useEffect(() => {
+    if (!user) {
+      setContasBancarias([]);
+      setClientes([]);
+      setCategorias([]);
+      setContasReceber([]);
+      setContasPagar([]);
+      return;
+    }
+
     const fetchDadosBackend = async () => {
       try {
         const [cbRes, cliRes, catRes, crRes, cpRes] = await Promise.all([
@@ -75,7 +86,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
     fetchDadosBackend();
-  }, []);
+  }, [user]);
 
   const generateId = () => crypto.randomUUID();
 
