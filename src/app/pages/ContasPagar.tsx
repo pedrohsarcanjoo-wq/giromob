@@ -96,6 +96,7 @@ export function ContasPagar() {
   const [isParcelado, setIsParcelado] = useState(false);
   const [isCustoFixo, setIsCustoFixo] = useState(false);
   const [numParcelas, setNumParcelas] = useState(2);
+  const [duracaoCustoFixo, setDuracaoCustoFixo] = useState(12);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -123,6 +124,7 @@ export function ContasPagar() {
     setIsParcelado(false);
     setIsCustoFixo(false);
     setNumParcelas(2);
+    setDuracaoCustoFixo(12);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -148,7 +150,7 @@ export function ContasPagar() {
       updateContaPagar(selectedConta.id, base);
       toast.success('Conta atualizada com sucesso!');
     } else if (isCustoFixo) {
-      addCustoFixo(base);
+      addCustoFixo(base, duracaoCustoFixo);
       toast.success('Custo Fixo configurado com sucesso! 🎉', {
         description: `${formData.fornecedor} — ${formatCurrency(parseFloat(formData.valor))} recorrente.`,
       });
@@ -456,8 +458,30 @@ export function ContasPagar() {
                       </span>
                     </button>
                     {isCustoFixo && (
-                      <div className="px-4 py-3 text-xs text-foreground/60 bg-purple-500/5">
-                        Esta despesa será replicada automaticamente para os próximos meses (5 anos) mantendo o mesmo valor e vencimento.
+                      <div className="px-4 py-4 space-y-4 bg-purple-500/5">
+                        <div className="space-y-2">
+                          <Label>Duração do Custo Fixo</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {[12, 24, 36, 40].map(n => (
+                              <button
+                                key={n}
+                                type="button"
+                                onClick={() => setDuracaoCustoFixo(n)}
+                                className={cn(
+                                  'w-auto px-3 h-10 rounded-lg text-sm font-semibold border transition-all',
+                                  duracaoCustoFixo === n
+                                    ? 'bg-purple-500 text-white border-purple-500 shadow-md shadow-purple-500/30'
+                                    : 'border-border/40 text-foreground/70 hover:border-purple-500/50 hover:text-purple-400'
+                                )}
+                              >
+                                {n} meses
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="text-xs text-foreground/60">
+                          Esta despesa será replicada automaticamente para os próximos <strong>{duracaoCustoFixo} meses</strong>, mantendo o mesmo valor e vencimento base.
+                        </div>
                       </div>
                     )}
                   </div>
