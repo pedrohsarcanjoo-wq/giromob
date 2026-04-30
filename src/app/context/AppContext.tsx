@@ -242,7 +242,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addCustoFixo = (conta: Omit<ContaPagar, 'id' | 'created_at' | 'parcela_atual' | 'total_parcelas' | 'grupo_parcelamento' | 'is_fixed_cost'>) => {
     const grupoId = generateId();
     const novasParcelas: ContaPagar[] = [];
-    const totalMeses = 60; // 5 anos
+    const totalMeses = 12; // 1 ano
 
     for (let i = 0; i < totalMeses; i++) {
       const dataBase = new Date(conta.data_vencimento + 'T12:00:00Z');
