@@ -31,7 +31,7 @@ import {
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Plus, Check, Pencil, Filter, Inbox, CreditCard, Layers, ChevronDown, ChevronRight, FileDown, Trash2 } from 'lucide-react';
+import { Plus, Check, Pencil, Filter, Inbox, CreditCard, Layers, ChevronDown, ChevronRight, FileDown, Trash2, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { ContaPagar, StatusDespesa } from '../types';
 import { cn } from '../components/ui/utils';
@@ -44,6 +44,7 @@ export function ContasPagar() {
     contasBancarias,
     addContaPagar,
     addContasPagarParceladas,
+    addCustoFixo,
     updateContaPagar,
     confirmarPagamento,
     deleteContaPagar,
@@ -91,8 +92,9 @@ export function ContasPagar() {
     toast.success('Comprovante gerado!');
   };
 
-  // Modo parcelado
+  // Modo parcelado e Custo Fixo
   const [isParcelado, setIsParcelado] = useState(false);
+  const [isCustoFixo, setIsCustoFixo] = useState(false);
   const [numParcelas, setNumParcelas] = useState(2);
 
   // Form state
@@ -119,6 +121,7 @@ export function ContasPagar() {
       conta_bancaria_id: '',
     });
     setIsParcelado(false);
+    setIsCustoFixo(false);
     setNumParcelas(2);
   };
 
@@ -144,6 +147,11 @@ export function ContasPagar() {
     if (selectedConta) {
       updateContaPagar(selectedConta.id, base);
       toast.success('Conta atualizada com sucesso!');
+    } else if (isCustoFixo) {
+      addCustoFixo(base);
+      toast.success('Custo Fixo configurado com sucesso! 🎉', {
+        description: `${formData.fornecedor} — ${formatCurrency(parseFloat(formData.valor))} recorrente.`,
+      });
     } else if (isParcelado && numParcelas > 1) {
       addContasPagarParceladas(base, numParcelas);
       toast.success(`${numParcelas} parcelas criadas com sucesso! 🎉`, {
@@ -162,6 +170,7 @@ export function ContasPagar() {
   const handleEdit = (conta: ContaPagar) => {
     setSelectedConta(conta);
     setIsParcelado(false);
+    setIsCustoFixo(false);
     setFormData({
       fornecedor: conta.fornecedor,
       categoria_id: conta.categoria_id,
@@ -415,32 +424,70 @@ export function ContasPagar() {
                 />
               </div>
 
-              {/* ======== SEÇÃO DE PARCELAMENTO ======== */}
+              {/* ======== SEÇÃO DE PARCELAMENTO / CUSTO FIXO ======== */}
               {!selectedConta && (
-                <div className="border border-border/40 rounded-xl overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setIsParcelado(!isParcelado)}
-                    className={cn(
-                      'w-full flex items-center justify-between px-4 py-3 text-sm font-medium transition-all',
-                      isParcelado
-                        ? 'bg-blue-500/10 text-blue-400 border-b border-blue-500/20'
-                        : 'bg-muted/30 text-foreground/70 hover:bg-muted/50'
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* CUSTO FIXO */}
+                  <div className="border border-border/40 rounded-xl overflow-hidden self-start">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustoFixo(!isCustoFixo);
+                        if (!isCustoFixo) setIsParcelado(false);
+                      }}
+                      className={cn(
+                        'w-full flex items-center justify-between px-4 py-3 text-sm font-medium transition-all',
+                        isCustoFixo
+                          ? 'bg-purple-500/10 text-purple-400 border-b border-purple-500/20'
+                          : 'bg-muted/30 text-foreground/70 hover:bg-muted/50'
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <RefreshCcw className="h-4 w-4" />
+                        Custo Fixo
+                      </span>
+                      <span className={cn(
+                        'text-xs px-2 py-0.5 rounded-full border font-semibold',
+                        isCustoFixo
+                          ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                          : 'bg-muted text-muted-foreground border-border/40'
+                      )}>
+                        {isCustoFixo ? 'ATIVO' : 'INATIVO'}
+                      </span>
+                    </button>
+                    {isCustoFixo && (
+                      <div className="px-4 py-3 text-xs text-foreground/60 bg-purple-500/5">
+                        Esta despesa será replicada automaticamente para os próximos meses (5 anos) mantendo o mesmo valor e vencimento.
+                      </div>
                     )}
-                  >
-                    <span className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4" />
-                      Parcelar compra
-                    </span>
-                    <span className={cn(
-                      'text-xs px-2 py-0.5 rounded-full border font-semibold',
-                      isParcelado
-                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                        : 'bg-muted text-muted-foreground border-border/40'
-                    )}>
-                      {isParcelado ? 'ATIVO' : 'INATIVO'}
-                    </span>
-                  </button>
+                  </div>
+
+                  {/* PARCELAMENTO */}
+                  <div className={cn("border border-border/40 rounded-xl overflow-hidden self-start", isCustoFixo && "opacity-50 pointer-events-none")}>
+                    <button
+                      type="button"
+                      disabled={isCustoFixo}
+                      onClick={() => setIsParcelado(!isParcelado)}
+                      className={cn(
+                        'w-full flex items-center justify-between px-4 py-3 text-sm font-medium transition-all',
+                        isParcelado
+                          ? 'bg-blue-500/10 text-blue-400 border-b border-blue-500/20'
+                          : 'bg-muted/30 text-foreground/70 hover:bg-muted/50'
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4" />
+                        Parcelar compra
+                      </span>
+                      <span className={cn(
+                        'text-xs px-2 py-0.5 rounded-full border font-semibold',
+                        isParcelado
+                          ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                          : 'bg-muted text-muted-foreground border-border/40'
+                      )}>
+                        {isParcelado ? 'ATIVO' : 'INATIVO'}
+                      </span>
+                    </button>
 
                   {isParcelado && (
                     <div className="px-4 py-4 space-y-4 bg-blue-500/5">
@@ -505,6 +552,7 @@ export function ContasPagar() {
                       )}
                     </div>
                   )}
+                </div>
                 </div>
               )}
               {/* ======================================= */}
@@ -617,6 +665,7 @@ export function ContasPagar() {
                       const valorParcela = parcelas[0]?.valor || 0;
                       const fornecedor = parcelas[0]?.fornecedor || '—';
                       const catId = parcelas[0]?.categoria_id || '';
+                      const isFixedCost = parcelas[0]?.is_fixed_cost === true;
                       const algumVencido = parcelas.some(p => p.status === 'previsto' && isDatePast(p.data_vencimento));
                       const proximaParcela = parcelas.find(p => p.status === 'previsto');
 
@@ -650,13 +699,23 @@ export function ContasPagar() {
                             {proximaParcela ? formatDate(proximaParcela.data_vencimento) : '—'}
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant="outline"
-                              className="gap-1 items-center border-blue-500/30 text-blue-400 bg-blue-500/10"
-                            >
-                              <Layers className="h-3 w-3" />
-                              {totalPago}/{totalParcelas} pagas
-                            </Badge>
+                            {isFixedCost ? (
+                              <Badge
+                                variant="outline"
+                                className="gap-1 items-center border-purple-500/30 text-purple-400 bg-purple-500/10"
+                              >
+                                <RefreshCcw className="h-3 w-3" />
+                                Custo Fixo
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="gap-1 items-center border-blue-500/30 text-blue-400 bg-blue-500/10"
+                              >
+                                <Layers className="h-3 w-3" />
+                                {totalPago}/{totalParcelas} pagas
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>
                             {algumVencido ? (
@@ -690,12 +749,19 @@ export function ContasPagar() {
                           )}
                         >
                           <TableCell className="pl-10 text-foreground/70 text-sm">
-                            <span className="inline-flex items-center gap-1.5">
-                              <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                                {conta.parcela_atual}
+                            {conta.is_fixed_cost ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <RefreshCcw className="h-3 w-3 text-purple-400" />
+                                Custo Fixo
                               </span>
-                              Parcela {conta.parcela_atual}/{conta.total_parcelas}
-                            </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                                  {conta.parcela_atual}
+                                </span>
+                                Parcela {conta.parcela_atual}/{conta.total_parcelas}
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell className="text-foreground/60 text-sm">
                             {getCategoriaNome(conta.categoria_id)}

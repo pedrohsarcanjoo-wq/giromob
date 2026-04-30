@@ -17,6 +17,9 @@ interface AppContextType {
   contasReceber: ContaReceber[];
   contasPagar: ContaPagar[];
   
+  refreshData: () => Promise<void>;
+  isLoadingData: boolean;
+
   // Contas Bancárias
   addContaBancaria: (conta: Omit<ContaBancaria, 'id' | 'created_at'>) => void;
   updateContaBancaria: (id: string, conta: Partial<ContaBancaria>) => void;
@@ -41,6 +44,7 @@ interface AppContextType {
   // Contas a Pagar
   addContaPagar: (conta: Omit<ContaPagar, 'id' | 'created_at'>) => void;
   addContasPagarParceladas: (conta: Omit<ContaPagar, 'id' | 'created_at' | 'parcela_atual' | 'total_parcelas' | 'grupo_parcelamento'>, totalParcelas: number) => void;
+  addCustoFixo: (conta: Omit<ContaPagar, 'id' | 'created_at' | 'parcela_atual' | 'total_parcelas' | 'grupo_parcelamento' | 'is_fixed_cost'>) => void;
   updateContaPagar: (id: string, conta: Partial<ContaPagar>) => void;
   deleteContaPagar: (id: string) => void;
   confirmarPagamento: (id: string, contaBancariaId: string) => void;
@@ -56,6 +60,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [categorias, setCategorias] = useState<CategoriaCusto[]>([]);
   const [contasReceber, setContasReceber] = useState<ContaReceber[]>([]);
   const [contasPagar, setContasPagar] = useState<ContaPagar[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
     if (!user) {
@@ -64,29 +69,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setCategorias([]);
       setContasReceber([]);
       setContasPagar([]);
+      setIsLoadingData(false);
       return;
     }
 
-    const fetchDadosBackend = async () => {
-      try {
-        const [cbRes, cliRes, catRes, crRes, cpRes] = await Promise.all([
-          api.get('/contas-bancarias'),
-          api.get('/clientes'),
-          api.get('/categorias'),
-          api.get('/contas-receber'),
-          api.get('/contas-pagar')
-        ]);
-        setContasBancarias(cbRes);
-        setClientes(cliRes);
-        setCategorias(catRes);
-        setContasReceber(crRes);
-        setContasPagar(cpRes);
-      } catch (error) {
-        console.warn('⚠️ AVISO: Backend não acessível. O sistema continuará funcionando com os dados locais simulados para segurança visual.');
-      }
-    };
     fetchDadosBackend();
   }, [user]);
+
+  const fetchDadosBackend = async () => {
+    setIsLoadingData(true);
+    try {
+      const results = await Promise.allSettled([
+        api.get('/contas-bancarias'),
+        api.get('/clientes'),
+        api.get('/categorias'),
+        api.get('/contas-receber'),
+        api.get('/contas-pagar')
+      ]);
+
+      if (results[0].status === 'fulfilled') setContasBancarias(results[0].value);
+      if (results[1].status === 'fulfilled') setClientes(results[1].value);
+      if (results[2].status === 'fulfilled') setCategorias(results[2].value);
+      if (results[3].status === 'fulfilled') setContasReceber(results[3].value);
+      if (results[4].status === 'fulfilled') setContasPagar(results[4].value);
+      
+      const hasErrors = results.some(r => r.status === 'rejected');
+      if (hasErrors) {
+        console.warn('⚠️ AVISO: Algumas requisições falharam. Dados podem estar incompletos.');
+      }
+    } catch (error) {
+      console.error('Erro fatal ao buscar dados:', error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
 
   const generateId = () => crypto.randomUUID();
 
@@ -223,6 +239,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const addCustoFixo = (conta: Omit<ContaPagar, 'id' | 'created_at' | 'parcela_atual' | 'total_parcelas' | 'grupo_parcelamento' | 'is_fixed_cost'>) => {
+    const grupoId = generateId();
+    const novasParcelas: ContaPagar[] = [];
+    const totalMeses = 60; // 5 anos
+
+    for (let i = 0; i < totalMeses; i++) {
+      const dataBase = new Date(conta.data_vencimento + 'T12:00:00Z');
+      dataBase.setMonth(dataBase.getMonth() + i);
+      const dataVencimento = dataBase.toISOString().split('T')[0];
+      const competencia = dataVencimento.substring(0, 7);
+
+      const parcela: ContaPagar = {
+        ...conta,
+        id: generateId(),
+        created_at: new Date().toISOString(),
+        data_vencimento: dataVencimento,
+        competencia,
+        grupo_parcelamento: grupoId,
+        is_fixed_cost: true,
+      };
+
+      novasParcelas.push(parcela);
+    }
+
+    setContasPagar(prev => [...prev, ...novasParcelas]);
+    
+    api.post('/contas-pagar/bulk', { parcelas: novasParcelas }).catch((err) => {
+      console.error('Erro ao salvar custo fixo em lote:', err);
+    });
+  };
+
   const confirmarPagamento = (id: string, contaBancariaId: string) => {
     setContasPagar(contasPagar.map(c => {
       if (c.id === id) {
@@ -245,6 +292,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       categorias,
       contasReceber,
       contasPagar,
+      refreshData: fetchDadosBackend,
+      isLoadingData,
       addContaBancaria,
       updateContaBancaria,
       deleteContaBancaria,
@@ -260,6 +309,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       confirmarRecebimento,
       addContaPagar,
       addContasPagarParceladas,
+      addCustoFixo,
       updateContaPagar,
       deleteContaPagar,
       confirmarPagamento,

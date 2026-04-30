@@ -257,7 +257,8 @@ router.get('/contas-receber', async (req, res) => {
     status: db.status === 'PAID' ? 'recebido' : (db.status === 'CANCELLED' ? 'cancelado' : 'previsto'),
     conta_bancaria_id: db.bankAccountId || undefined,
     competencia: db.dueDate.toISOString().substring(0, 7),
-    created_at: db.createdAt
+    created_at: db.createdAt,
+    is_fixed_cost: db.isFixedCost
   }));
   res.json(formated);
 });
@@ -284,7 +285,8 @@ router.post('/contas-receber', async (req, res) => {
       paymentDate: f.data_recebimento ? new Date(f.data_recebimento + 'T12:00:00Z') : null,
       clientSupplierId: f.cliente_id,
       bankAccountId: f.conta_bancaria_id,
-      categoryId: cat.id
+      categoryId: cat.id,
+      isFixedCost: f.is_fixed_cost || false
     }
   });
   res.json(db);
@@ -342,6 +344,7 @@ router.get('/contas-pagar', async (req, res) => {
     parcela_atual: db.installmentNumber || undefined,
     total_parcelas: db.totalInstallments || undefined,
     grupo_parcelamento: db.installmentGroupId || undefined,
+    is_fixed_cost: db.isFixedCost
   }));
   res.json(formated);
 });
@@ -376,8 +379,8 @@ router.post('/contas-pagar', async (req, res) => {
       installmentNumber: f.parcela_atual || null,
       totalInstallments: f.total_parcelas || null,
       installmentGroupId: f.grupo_parcelamento || null,
+      isFixedCost: f.is_fixed_cost || false
     }
-  });
   });
   res.json(db);
 });
@@ -418,6 +421,7 @@ router.post('/contas-pagar/bulk', async (req, res) => {
       installmentNumber: f.parcela_atual || null,
       totalInstallments: f.total_parcelas || null,
       installmentGroupId: f.grupo_parcelamento || null,
+      isFixedCost: f.is_fixed_cost || false
     }));
 
     // Cria as transações numa operação bulk "Tudo ou Nada"

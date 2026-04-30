@@ -99,6 +99,9 @@ model Transaction {
   totalInstallments    Int?    // Total de parcelas (ex: 6, 12)
   installmentGroupId   String? // UUID que agrupa todas as parcelas de uma mesma compra
 
+  // Custos Fixos
+  isFixedCost     Boolean  @default(false)
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

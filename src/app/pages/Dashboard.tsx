@@ -2,6 +2,7 @@ import { useApp } from '../context/AppContext';
 import { formatCurrency, getCurrentMonthYear, isDatePast, getLast6Months, getMonthNameShort } from '../utils/formatters';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
 import { cn } from '../components/ui/utils';
 import {
   TrendingUp,
@@ -11,6 +12,7 @@ import {
   CreditCard,
   AlertCircle,
   PieChart as PieChartIcon,
+  RefreshCw,
 } from 'lucide-react';
 import {
   LineChart,
@@ -29,7 +31,7 @@ import {
 } from 'recharts';
 
 export function Dashboard() {
-  const { contasBancarias, contasReceber, contasPagar, categorias } = useApp();
+  const { contasBancarias, contasReceber, contasPagar, categorias, refreshData, isLoadingData } = useApp();
 
   const currentMonth = getCurrentMonthYear();
   const currentDate = new Date();
@@ -172,9 +174,20 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">Dashboard</h1>
-        <p className="text-foreground/70 mt-1">Visão geral do sistema financeiro</p>
+      <div className="flex justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">Dashboard</h1>
+          <p className="text-foreground/70 mt-1">Visão geral do sistema financeiro</p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={() => refreshData()} 
+          disabled={isLoadingData}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={cn("h-4 w-4", isLoadingData && "animate-spin")} />
+          <span className="hidden sm:inline">Atualizar Dados</span>
+        </Button>
       </div>
 
       {/* Alertas */}
